@@ -13,6 +13,40 @@
 
 int server_socket;
 
+
+void serve_file(int client_socket, const char *filename){
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        char* response = 
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Type: text/plain\r\n"
+            "\r\n"
+            "File not found";
+        send(client_socket, response, strlen(response), 0);
+    }
+
+    fseek(file, 0, SEEK_END);
+    int file_size = ftell(file);
+    rewind(file);
+
+    char headers[128];
+    sprintf(headers,
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: text/html\r\n"
+    "Content-Length: %d\r\n"
+    "\r\n"
+    ,
+    file_size);
+
+    send(client_socket, headers, strlen(headers), 0);
+    char buffer[BUFFER_SIZE];
+    while(fgets(buffer, BUFFER_SIZE, file)) {
+        send(client_socket, buffer, strlen(buffer), 0);
+    }
+
+    fclose(file);
+}
+
 void handle_request(int client_socket){
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received = recv(client_socket, buffer, BUFFER_SIZE-1, 0);
@@ -24,6 +58,35 @@ void handle_request(int client_socket){
     buffer[bytes_received] = '\0';
     printf("Received Request: \n%s\n", buffer);
 
+
+    // parse the url
+    char *url = strstr(buffer, "GET ");
+    if (url == NULL){
+        char *resp =
+            "HTTP/1.1 400 Bad request\r\n\r\n";
+        send(client_socket, resp, strlen(resp), 0);
+        return;
+    }
+
+    url += 4;
+    char* url_end = strstr(url, " HTTP");
+    if(url_end == NULL){
+        char *resp =
+            "HTTP/1.1 400 Bad request\r\n\r\n";
+        send(client_socket, resp, strlen(resp), 0);
+        return;
+    }
+    *url_end = '\0';
+
+    if (strcmp(url, "/") == 0) {
+        serve_file(client_socket, "index.html");
+    } else {
+        char* resp = 
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Type: text/plain\r\n"
+            "\r\n"  // header is over
+            "Page Not Found";
+    }
 
     // sending data to the client
     char *resp = 
@@ -75,7 +138,6 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Server Listening to the PORT %d\n", PORT);
-    signal(SIGINT, cleanup);
 
     // connection Loop
     while(1) {
@@ -85,6 +147,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
         handle_request(client_socket);
+        signal(SIGINT, cleanup);
     }
     return 0;
 }
