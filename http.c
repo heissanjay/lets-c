@@ -10,12 +10,10 @@
 #define PORT 8000
 #define BUFFER_SIZE 1024
 
-
 int server_socket;
 
-
 void serve_file(int client_socket, const char *filename){
-    FILE* file = fopen(filename, "r");
+    FILE* file = fopen(filename, "rb");
     if (file == NULL) {
         char* response = 
             "HTTP/1.1 404 Not Found\r\n"
@@ -23,6 +21,7 @@ void serve_file(int client_socket, const char *filename){
             "\r\n"
             "File not found";
         send(client_socket, response, strlen(response), 0);
+        return;
     }
 
     fseek(file, 0, SEEK_END);
@@ -32,7 +31,7 @@ void serve_file(int client_socket, const char *filename){
     char headers[128];
     sprintf(headers,
     "HTTP/1.1 200 OK\r\n"
-    "Content-Type: text/html\r\n"
+    "Content-Type: image/jpeg\r\n"
     "Content-Length: %d\r\n"
     "\r\n"
     ,
@@ -40,8 +39,9 @@ void serve_file(int client_socket, const char *filename){
 
     send(client_socket, headers, strlen(headers), 0);
     char buffer[BUFFER_SIZE];
-    while(fgets(buffer, BUFFER_SIZE, file)) {
-        send(client_socket, buffer, strlen(buffer), 0);
+    size_t bytes_read;
+    while((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
+        send(client_socket, buffer, bytes_read, 0);
     }
 
     fclose(file);
@@ -79,24 +79,26 @@ void handle_request(int client_socket){
     *url_end = '\0';
 
     if (strcmp(url, "/") == 0) {
-        serve_file(client_socket, "index.html");
+        serve_file(client_socket, "image.jpg");
     } else {
         char* resp = 
             "HTTP/1.1 404 Not Found\r\n"
             "Content-Type: text/plain\r\n"
             "\r\n"  // header is over
             "Page Not Found";
+        send(client_socket, resp, strlen(resp), 0);
     }
 
     // sending data to the client
-    char *resp = 
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/plain\r\n"
-        "\r\n"
-        "Hello, World!\n";
+    // char *resp = 
+    //     "HTTP/1.1 200 OK\r\n"
+    //     "Content-Type: text/plain\r\n"
+    //     "\r\n"
+    //     "Hello, World!\n";
 
-    send(client_socket, resp, strlen(resp), 0);
+    // send(client_socket, resp, strlen(resp), 0);
     shutdown(client_socket, 1);
+    return;
 }
 
 void cleanup(){
