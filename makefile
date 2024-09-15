@@ -9,7 +9,7 @@ EXE = http
 all: $(EXE) 
 
 # compile the source to the object
-$(OBJ): $(SRC)
+$(OBJ): $(SRC) http.h
 	$(CC) -c $(SRC)
 
 $(EXE): $(OBJ)
